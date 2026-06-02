@@ -1,7 +1,15 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
 const googleTTS = require('google-tts-api');
+const http = require('http');
 
+// 1. Serveur HTTP pour maintenir le bot éveillé sur les services cloud
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot Discord actif.');
+}).listen(process.env.PORT || 3000);
+
+// 2. Initialisation du client Discord avec les permissions nécessaires
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -14,9 +22,10 @@ const client = new Client({
 const PREFIX = "!";
 
 client.once('ready', () => {
-    console.log(`🤖 Robot connecté avec succès !`);
+    console.log(`🤖 Robot connecté sous le tag ${client.user.tag} !`);
 });
 
+// 3. Logique de commande TTS
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
@@ -32,12 +41,14 @@ client.on('messageCreate', async message => {
         if (!voiceChannel) return message.reply("Tu dois d'abord rejoindre un salon vocal !");
 
         try {
+            // Génération de l'URL TTS depuis Google
             const url = googleTTS.getAudioUrl(texteA_Dire, {
                 lang: 'fr',
                 slow: false,
                 host: 'https://translate.google.com',
             });
 
+            // Connexion au salon vocal
             const connection = joinVoiceChannel({
                 channelId: voiceChannel.id,
                 guildId: voiceChannel.guild.id,
@@ -46,7 +57,7 @@ client.on('messageCreate', async message => {
 
             const player = createAudioPlayer();
             
-            // Cette ligne force Discord à lire le flux audio directement sans buguer
+            // Préparation de la ressource audio
             const resource = createAudioResource(url, {
                 inputType: StreamType.Arbitrary
             });
@@ -54,18 +65,31 @@ client.on('messageCreate', async message => {
             player.play(resource);
             connection.subscribe(player);
 
+            // Gestion de la fin de lecture : déconnexion automatique
             player.on(AudioPlayerStatus.Idle, () => {
-                setTimeout(() => connection.destroy(), 1000);
+                setTimeout(() => {
+                    try {
+                        connection.destroy();
+                    } catch (e) {
+                        console.error("Erreur lors de la déconnexion :", e);
+                    }
+                }, 1000);
+            });
+
+            // Gestion des erreurs du lecteur pour éviter que le bot ne plante
+            player.on('error', (error) => {
+                console.error('Erreur AudioPlayer:', error);
+                connection.destroy();
             });
 
             await message.react('🤖');
 
         } catch (error) {
-            console.error(error);
-            message.reply("Erreur de voix.");
+            console.error('Erreur lors de la génération TTS :', error);
+            message.reply("Une erreur est survenue lors de la lecture du texte.");
         }
     }
 });
 
-// ⚠️ N'OUBLIE PAS DE METTRE TON TOKEN CI-DESSOUS
+// Connexion avec la variable d'environnement (sécurité)
 client.login(process.env.DISCORD_TOKEN);
