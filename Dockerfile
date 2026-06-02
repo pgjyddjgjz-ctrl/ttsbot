@@ -1,6 +1,6 @@
 FROM node:18-slim
-# Installation de ffmpeg et des dépendances nécessaires
-RUN apt-get update && apt-get install -y ffmpeg python3 build-essential
+# Installation de FFmpeg nécessaire pour le flux audio
+RUN apt-get update && apt-get install -y ffmpeg
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
