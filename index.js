@@ -18,24 +18,28 @@ client.on('messageCreate', async message => {
     if (!voiceChannel) return message.reply("Rejoins un salon !");
 
     try {
-        console.log("Génération TTS pour:", texte);
-        const url = googleTTS.getAudioUrl(texte, { lang: 'fr', slow: false, host: 'https://translate.google.com' });
+        const url = googleTTS.getAudioUrl(texte, { lang: 'fr', slow: false });
         
         const connection = joinVoiceChannel({
             channelId: voiceChannel.id,
             guildId: voiceChannel.guild.id,
             adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+            selfDeaf: false // Important pour ne pas être ignoré par Discord
         });
 
-        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
-        console.log("Connecté au salon vocal.");
+        // On attend plus longtemps et on gère l'annulation
+        try {
+            await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
+        } catch (error) {
+            connection.destroy();
+            throw new Error("Connexion au salon trop lente.");
+        }
 
         const player = createAudioPlayer();
         const resource = createAudioResource(url, { inputType: StreamType.Arbitrary });
 
         connection.subscribe(player);
         player.play(resource);
-        console.log("Lecture lancée.");
 
         player.on(AudioPlayerStatus.Idle, () => {
             connection.destroy();
@@ -47,7 +51,6 @@ client.on('messageCreate', async message => {
         });
 
     } catch (e) {
-        console.error("Erreur critique:", e);
         message.reply("Erreur : " + e.message);
     }
 });
