@@ -1,29 +1,21 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType, entersState, VoiceConnectionStatus } = require('@discordjs/voice');
 const googleTTS = require('google-tts-api');
 const http = require('http');
 
-http.createServer((req, res) => {
-    res.end('Bot actif');
-}).listen(process.env.PORT || 3000);
+http.createServer((req, res) => res.end('Bot actif')).listen(process.env.PORT || 3000);
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildVoiceStates
-    ]
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildVoiceStates]
 });
 
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.content.startsWith('!dis')) return;
-
     const args = message.content.slice(4).trim();
-    if (!args) return message.reply("Écris un texte après !dis");
+    if (!args) return message.reply("Écris un texte !");
 
     const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) return message.reply("Rejoins un salon vocal !");
+    if (!voiceChannel) return message.reply("Rejoins un salon !");
 
     try {
         const url = googleTTS.getAudioUrl(args, { lang: 'fr', slow: false });
@@ -32,6 +24,9 @@ client.on('messageCreate', async message => {
             guildId: voiceChannel.guild.id,
             adapterCreator: voiceChannel.guild.voiceAdapterCreator,
         });
+
+        // ATTENDRE que la connexion soit prête
+        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
 
         const player = createAudioPlayer();
         const resource = createAudioResource(url, { inputType: StreamType.Arbitrary });
@@ -43,13 +38,10 @@ client.on('messageCreate', async message => {
             connection.destroy();
         });
 
-        player.on('error', () => {
-            connection.destroy();
-        });
-
         await message.react('✅');
     } catch (e) {
-        message.reply("Erreur audio.");
+        console.error(e);
+        message.reply("Erreur : le bot n'a pas pu se connecter ou lire l'audio.");
     }
 });
 
