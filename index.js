@@ -68,4 +68,4 @@ client.on('messageCreate', async message => {
 });
 
 // ⚠️ N'OUBLIE PAS DE METTRE TON TOKEN CI-DESSOUS
-client.login('MTUxMTM5NDQ4NTgzNjMxNjg0Mw.GHKajs.QikOvB3sWt6zaWDlM-McjzJA9FL2z05ht_nXTQ');
+client.login(process.env.DISCORD_TOKEN);
