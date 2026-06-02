@@ -1,58 +1,40 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType, entersState, VoiceConnectionStatus } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
 const googleTTS = require('google-tts-api');
-const http = require('http');
-
-http.createServer((req, res) => res.end('OK')).listen(process.env.PORT || 3000);
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildVoiceStates]
 });
 
+client.once('ready', () => {
+    console.log(`Robot connecté sous le tag ${client.user.tag} !`);
+});
+
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.content.startsWith('!dis')) return;
-    const texte = message.content.slice(4).trim();
-    if (!texte) return;
 
-    const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) return message.reply("Rejoins un salon !");
+    const args = message.content.slice(4).trim();
+    const voiceChannel = message.member?.voice.channel;
 
-    try {
-        const url = googleTTS.getAudioUrl(texte, { lang: 'fr', slow: false });
-        
-        const connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: voiceChannel.guild.id,
-            adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-            selfDeaf: false // Important pour ne pas être ignoré par Discord
-        });
+    if (!voiceChannel) return message.reply("Tu dois être dans un salon vocal !");
 
-        // On attend plus longtemps et on gère l'annulation
-        try {
-            await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
-        } catch (error) {
-            connection.destroy();
-            throw new Error("Connexion au salon trop lente.");
-        }
+    const url = googleTTS.getAudioUrl(args, { lang: 'fr', slow: false });
+    
+    const connection = joinVoiceChannel({
+        channelId: voiceChannel.id,
+        guildId: voiceChannel.guild.id,
+        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+    });
 
-        const player = createAudioPlayer();
-        const resource = createAudioResource(url, { inputType: StreamType.Arbitrary });
+    const player = createAudioPlayer();
+    connection.subscribe(player);
+    
+    const resource = createAudioResource(url);
+    player.play(resource);
 
-        connection.subscribe(player);
-        player.play(resource);
-
-        player.on(AudioPlayerStatus.Idle, () => {
-            connection.destroy();
-        });
-
-        player.on('error', (err) => {
-            console.error("Erreur Player:", err);
-            connection.destroy();
-        });
-
-    } catch (e) {
-        message.reply("Erreur : " + e.message);
-    }
+    player.on(AudioPlayerStatus.Idle, () => {
+        connection.destroy();
+    });
 });
 
 client.login(process.env.DISCORD_TOKEN);
