@@ -3,7 +3,7 @@ const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerSta
 const googleTTS = require('google-tts-api');
 const http = require('http');
 
-http.createServer((req, res) => res.end('Bot actif')).listen(process.env.PORT || 3000);
+http.createServer((req, res) => res.end('OK')).listen(process.env.PORT || 3000);
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildVoiceStates]
@@ -11,37 +11,44 @@ const client = new Client({
 
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.content.startsWith('!dis')) return;
-    const args = message.content.slice(4).trim();
-    if (!args) return message.reply("Écris un texte !");
+    const texte = message.content.slice(4).trim();
+    if (!texte) return;
 
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) return message.reply("Rejoins un salon !");
 
     try {
-        const url = googleTTS.getAudioUrl(args, { lang: 'fr', slow: false });
+        console.log("Génération TTS pour:", texte);
+        const url = googleTTS.getAudioUrl(texte, { lang: 'fr', slow: false, host: 'https://translate.google.com' });
+        
         const connection = joinVoiceChannel({
             channelId: voiceChannel.id,
             guildId: voiceChannel.guild.id,
             adapterCreator: voiceChannel.guild.voiceAdapterCreator,
         });
 
-        // ATTENDRE que la connexion soit prête
         await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+        console.log("Connecté au salon vocal.");
 
         const player = createAudioPlayer();
         const resource = createAudioResource(url, { inputType: StreamType.Arbitrary });
 
         connection.subscribe(player);
         player.play(resource);
+        console.log("Lecture lancée.");
 
         player.on(AudioPlayerStatus.Idle, () => {
             connection.destroy();
         });
 
-        await message.react('✅');
+        player.on('error', (err) => {
+            console.error("Erreur Player:", err);
+            connection.destroy();
+        });
+
     } catch (e) {
-        console.error(e);
-        message.reply("Erreur : le bot n'a pas pu se connecter ou lire l'audio.");
+        console.error("Erreur critique:", e);
+        message.reply("Erreur : " + e.message);
     }
 });
 
