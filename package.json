@@ -2,13 +2,11 @@
   "name": "ttsbot",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "scripts": { "start": "node index.js" },
   "dependencies": {
     "discord.js": "^14.14.1",
     "@discordjs/voice": "^0.17.0",
-    "google-tts-api": "^2.0.2",
+    "discord-tts": "^1.2.0",
     "libsodium-wrappers": "^0.7.13"
   }
 }
